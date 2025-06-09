@@ -11,7 +11,9 @@ node_modules
 dist
 dist-ssr
 .bolt
+.cursor
 *.local
+.gitignore
 
 # Editor directories and files
 .vscode/*

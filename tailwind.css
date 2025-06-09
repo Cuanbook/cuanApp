@@ -43,6 +43,9 @@
     --ring: 215 20.2% 65.1%;
 
     --radius: 0.5rem;
+
+    --chart-income: #54D12B;
+    --chart-expense: #EF4444;
   }
 
   .dark {
@@ -76,6 +79,10 @@
     --ring: 216 34% 17%;
 
     --radius: 0.5rem;
+  }
+
+  html {
+    font-family: 'Manrope', system-ui, sans-serif;
   }
 }
 

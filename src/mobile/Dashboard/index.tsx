@@ -1,9 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 import { ArrowUpRight, ArrowDownLeft, Plus } from "lucide-react";
 
 import { TransactionFormData } from "@components/Dashboard/TransactionForm";
 import TransactionModal from "@components/Dashboard/TransactionModal";
+// @ts-ignore
+import { ChartBar } from "@components/Dashboard/ChartBar";
 import BottomNavigation from "@ui/BottomNavigation";
 
 type TimePeriod = 'daily' | 'weekly' | 'monthly';
@@ -13,11 +15,16 @@ interface FinancialData {
   expense: number;
   balance: number;
   percentageChange: number;
+  chartData: Array<{
+    month: string;
+    value: number;
+  }>;
 }
 
 const Dashboard: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('monthly');
+  const [animatingHeights, setAnimatingHeights] = useState<number[]>([]);
 
   // Sample financial data for different periods
   const financialData: Record<TimePeriod, FinancialData> = {
@@ -26,18 +33,42 @@ const Dashboard: React.FC = () => {
       expense: 1000000,
       balance: 1000000,
       percentageChange: 5,
+      chartData: [
+        { month: "06:00", value: 200000 },
+        { month: "09:00", value: 400000 },
+        { month: "12:00", value: 600000 },
+        { month: "15:00", value: 400000 },
+        { month: "18:00", value: 300000 },
+        { month: "21:00", value: 100000 },
+      ],
     },
     weekly: {
       income: 8000000,
       expense: 4000000,
       balance: 4000000,
       percentageChange: 10,
+      chartData: [
+        { month: "Senin", value: 1500000 },
+        { month: "Selasa", value: 1200000 },
+        { month: "Rabu", value: 1800000 },
+        { month: "Kamis", value: 1300000 },
+        { month: "Jumat", value: 1400000 },
+        { month: "Sabtu", value: 800000 },
+      ],
     },
     monthly: {
       income: 15000000,
       expense: 7500000,
       balance: 7500000,
       percentageChange: 15,
+      chartData: [
+        { month: "Januari", value: 2500000 },
+        { month: "Februari", value: 2800000 },
+        { month: "Maret", value: 2300000 },
+        { month: "April", value: 2600000 },
+        { month: "Mei", value: 2400000 },
+        { month: "Juni", value: 2400000 },
+      ],
     },
   };
 
@@ -66,6 +97,33 @@ const Dashboard: React.FC = () => {
         return 'Bulan Ini';
     }
   };
+
+  const chartData: Record<TimePeriod, { labels: string[], heights: number[] }> = {
+    daily: {
+      labels: ["06:00", "09:00", "12:00", "15:00", "18:00", "21:00"],
+      heights: [30, 60, 90, 60, 45, 15]
+    },
+    weekly: {
+      labels: ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab"],
+      heights: [75, 60, 90, 65, 70, 40]
+    },
+    monthly: {
+      labels: ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun"],
+      heights: [80, 90, 70, 85, 75, 75]
+    }
+  };
+
+  useEffect(() => {
+    // Start with height 0 when switching periods
+    setAnimatingHeights(new Array(6).fill(0));
+    
+    // Animate to new heights after a brief delay
+    const timer = setTimeout(() => {
+      setAnimatingHeights(chartData[selectedPeriod].heights);
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [selectedPeriod]);
 
   return (
     <>
@@ -130,20 +188,28 @@ const Dashboard: React.FC = () => {
                   Rp {formatCurrency(currentData.balance)}
                 </span>
                 <div className="flex items-center gap-1">
-                  <span className="text-[#639154]">{getPeriodLabel(selectedPeriod)}</span>
-                  <span className="text-[#088721] font-medium">
+                  <span className="text-[#639154] text-base">{getPeriodLabel(selectedPeriod)}</span>
+                  <span className="text-[#088721] font-medium text-base">
                     +{currentData.percentageChange}%
                   </span>
                 </div>
               </div>
 
-              {/* Monthly Chart */}
+              {/* Chart */}
               <div className="flex gap-6 px-3 mt-4">
-                {["Jan", "Feb", "Mar", "Apr", "Mei", "Jun"].map((month) => (
-                  <div key={month} className="flex flex-col items-end gap-6">
-                    <div className="w-full h-[137px] bg-[#EBF2E8] border-t-2 border-[#757575]" />
+                {chartData[selectedPeriod].labels.map((label, index) => (
+                  <div key={label} className="flex flex-col items-end gap-6 flex-1">
+                    <div className="relative w-full h-[137px]">
+                      <div 
+                        className="absolute bottom-0 w-full bg-[#EBF2E8] border-t-2 border-[#757575] transition-all duration-500 ease-out" 
+                        style={{ 
+                          height: `${animatingHeights[index]}%`,
+                          transformOrigin: 'bottom'
+                        }} 
+                      />
+                    </div>
                     <span className="font-manrope font-bold text-[13px] text-[#639154]">
-                      {month}
+                      {label}
                     </span>
                   </div>
                 ))}

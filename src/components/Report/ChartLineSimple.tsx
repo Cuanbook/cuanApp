@@ -25,13 +25,24 @@ interface ChartLineSimpleProps {
 
 export function ChartLineSimple({ title, amount, trend, data, shouldAnimate }: ChartLineSimpleProps) {
   const [key, setKey] = useState(0);
+  const [animatedData, setAnimatedData] = useState(data);
 
-  // Update key only when shouldAnimate is true (tab switch)
+  // Reset animation when data changes
   useEffect(() => {
     if (shouldAnimate) {
-      setKey(prev => prev + 1);
+      // First set all values to 0
+      setAnimatedData(data.map(item => ({ ...item, value: 0 })));
+      
+      // After a brief delay, animate to actual values
+      const timer = setTimeout(() => {
+        setAnimatedData(data);
+      }, 50);
+
+      return () => clearTimeout(timer);
+    } else {
+      setAnimatedData(data);
     }
-  }, [shouldAnimate, data]);
+  }, [data, shouldAnimate]);
 
   return (
     <div className="space-y-2">
@@ -53,7 +64,7 @@ export function ChartLineSimple({ title, amount, trend, data, shouldAnimate }: C
           key={key}
           width={358}
           height={148}
-          data={data}
+          data={animatedData}
           margin={{
             top: 5,
             right: 5,
@@ -90,10 +101,10 @@ export function ChartLineSimple({ title, amount, trend, data, shouldAnimate }: C
             strokeWidth={3}
             dot={false}
             activeDot={{ r: 4, fill: "#54D12B" }}
-            isAnimationActive={shouldAnimate}
+            isAnimationActive={true}
             animationDuration={800}
             animationBegin={0}
-            animationEasing="ease"
+            animationEasing="ease-out"
           />
         </LineChart>
       </div>

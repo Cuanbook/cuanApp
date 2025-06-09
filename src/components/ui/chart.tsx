@@ -1,142 +1,60 @@
-import * as React from "react"
-import { type TooltipProps } from "recharts"
-import {
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Line,
-  LineChart,
-} from "recharts"
-
-import { cn } from "@/lib/utils"
+import React, { ReactElement } from "react";
+import { TooltipProps } from "recharts";
+import { ResponsiveContainer } from "recharts";
 
 export interface ChartConfig {
   [key: string]: {
-    label: string
-    color?: string
-  }
+    label: string;
+    color: string;
+  };
 }
 
-interface ChartContainerProps extends React.HTMLAttributes<HTMLDivElement> {
-  config: ChartConfig
-  children: React.ReactNode
+interface ChartContainerProps {
+  config: ChartConfig;
+  children: ReactElement;
 }
 
-export function ChartContainer({
-  config,
-  children,
-  className,
-  ...props
-}: ChartContainerProps) {
+export function ChartContainer({ config, children }: ChartContainerProps) {
   return (
-    <div className={cn("h-[350px] w-full", className)} {...props}>
+    <div className="w-full h-[137px]">
       <ResponsiveContainer width="100%" height="100%">
         {children}
       </ResponsiveContainer>
     </div>
-  )
+  );
 }
 
-interface ChartTooltipProps<TData extends object> extends TooltipProps<any, any> {
-  content?: React.ReactNode
-  className?: string
-}
-
-export function ChartTooltip<TData extends object>({
-  active,
-  payload,
-  label,
-  content,
-  className,
-}: ChartTooltipProps<TData>) {
-  if (!active || !payload) {
-    return null
-  }
-
-  return (
-    <div
-      className={cn(
-        "rounded-lg border bg-background p-2 shadow-sm",
-        className
-      )}
-    >
-      {content ?? (
-        <div className="grid gap-2">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1">
-              <div className="h-1.5 w-1.5 rounded-full bg-foreground" />
-              <span className="text-[0.70rem] uppercase text-muted-foreground">
-                {label}
-              </span>
-            </div>
-            <span className="text-[0.70rem] font-bold">
-              {payload[0].value}
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-interface ChartTooltipContentProps {
-  className?: string
-  nameKey?: string
-  labelFormatter?: (value: string) => string
-  hideLabel?: boolean
+interface ChartTooltipContentProps extends TooltipProps<any, any> {
+  hideLabel?: boolean;
 }
 
 export function ChartTooltipContent({
-  className,
-  nameKey = "name",
-  labelFormatter = (value) => value,
+  active,
+  payload,
   hideLabel = false,
 }: ChartTooltipContentProps) {
-  return function Content({
-    active,
-    payload,
-    label,
-  }: TooltipProps<any, any>) {
-    if (!active || !payload) {
-      return null
-    }
+  if (!active || !payload?.length) return null;
 
-    return (
-      <div
-        className={cn(
-          "rounded-lg border bg-background p-2 shadow-sm",
-          className
-        )}
-      >
-        <div className="grid gap-2">
-          {!hideLabel && (
-            <div className="flex items-center gap-1">
-              <span className="text-[0.70rem] uppercase text-muted-foreground">
-                {labelFormatter(label)}
-              </span>
-            </div>
-          )}
-          <div className="flex flex-col gap-1">
-            {payload.map(({ value, name, color }) => (
-              <div
-                key={name}
-                className="flex items-center justify-between gap-2 text-[0.70rem]"
-              >
-                <div className="flex items-center gap-1">
-                  <div
-                    className="h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: color }}
-                  />
-                  <span className="text-muted-foreground">{name}</span>
-                </div>
-                <span className="font-bold">Rp {value.toLocaleString()}</span>
-              </div>
-            ))}
+  return (
+    <div className="rounded-lg border bg-background p-2 shadow-sm">
+      <div className="grid gap-2">
+        {payload.map((item: any, index: number) => (
+          <div key={index} className="flex items-center gap-2">
+            <div
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            {!hideLabel && (
+              <span className="font-medium">{item.name}:</span>
+            )}
+            <span>Rp {item.value.toLocaleString()}</span>
           </div>
-        </div>
+        ))}
       </div>
-    )
-  }
+    </div>
+  );
+}
+
+export function ChartTooltip(props: any) {
+  return <ChartTooltipContent {...props} />;
 } 
