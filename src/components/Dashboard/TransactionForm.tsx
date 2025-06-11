@@ -54,11 +54,12 @@ interface TransactionFormProps {
 }
 
 export interface TransactionFormData {
-  type: string;
-  amount: string;
-  date: Date | null;
+  type: "INCOME" | "EXPENSE";
+  amount: number;
+  date: string;
   category: string;
-  description: string;
+  name: string;
+  description?: string;
 }
 
 const TransactionForm: React.FC<TransactionFormProps> = ({
@@ -68,10 +69,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 }) => {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [formData, setFormData] = useState<TransactionFormData>({
-    type: '',
-    amount: '',
-    date: null,
+    type: type === 'income' ? 'INCOME' : 'EXPENSE',
+    amount: 0,
+    date: '',
     category: '',
+    name: '',
     description: '',
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -120,7 +122,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   };
 
   const handleDateChange = (date: Date | null) => {
-    setFormData(prev => ({ ...prev, date }));
+    setFormData(prev => ({ ...prev, date: date ? date.toISOString() : '' }));
     setShowDatePicker(false);
   };
 
@@ -200,7 +202,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <input
                   type="text"
                   readOnly
-                  value={formatDate(formData.date)}
+                  value={formatDate(formData.date ? new Date(formData.date) : null)}
                   placeholder="DD/MM/YYYY"
                   className="flex-1 bg-transparent px-4 text-[#639154] placeholder-[#639154] font-inter cursor-pointer"
                 />
@@ -211,7 +213,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               {showDatePicker && (
                 <div className="absolute z-50 mt-2">
                   <DatePicker
-                    selected={formData.date}
+                    selected={formData.date ? new Date(formData.date) : null}
                     onChange={handleDateChange}
                     inline
                     dateFormat="dd/MM/yyyy"
