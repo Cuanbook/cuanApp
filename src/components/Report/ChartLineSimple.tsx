@@ -59,7 +59,7 @@ export function ChartLineSimple({ title, amount, trend, data, shouldAnimate }: C
         </div>
       </div>
 
-      <div className="h-[148px] w-full">
+      <div className="h-[148px] w-full" data-testid="chart-line-simple">
         <LineChart
           key={key}
           width={358}
