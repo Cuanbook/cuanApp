@@ -1,71 +1,35 @@
-import React, { useState } from 'react';
-
+import React, { useState, useEffect } from 'react';
 import { Search, Calendar, ChevronDown } from 'lucide-react';
-
 import BottomNavigation from '@ui/BottomNavigation';
 import TransactionCard from '@components/Transaction/TransactionCard';
 
 interface Transaction {
   id: string;
-  type: 'income' | 'expense';
-  title: string;
+  type: 'INCOME' | 'EXPENSE';
+  name: string;
   amount: number;
-  category: string;
-  date: Date;
+  category: { name: string };
+  date: string;
 }
 
 const TransactionScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [transactions] = useState<Transaction[]>([
-    {
-      id: '1',
-      type: 'expense',
-      title: 'Perlengkapan Kantor',
-      amount: 250000,
-      category: 'Operational',
-      date: new Date(),
-    },
-    {
-      id: '2',
-      type: 'income',
-      title: 'Pendapatan Penjualan',
-      amount: 1500000,
-      category: 'Product Sales',
-      date: new Date(),
-    },
-    {
-      id: '3',
-      type: 'expense',
-      title: 'Biaya Pemasaran',
-      amount: 75000,
-      category: 'Marketing',
-      date: new Date(),
-    },
-    {
-      id: '4',
-      type: 'income',
-      title: 'Biaya Layanan',
-      amount: 200000,
-      category: 'Service Fee',
-      date: new Date(),
-    },
-    {
-      id: '5',
-      type: 'expense',
-      title: 'Transportasi',
-      amount: 50000,
-      category: 'Transportation',
-      date: new Date(),
-    },
-    {
-      id: '6',
-      type: 'income',
-      title: 'Pemasukan Konsultasi',
-      amount: 300000,
-      category: 'Consulting',
-      date: new Date(),
-    },
-  ]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const res = await fetch('http://localhost:3000/api/transactions', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTransactions(data.transactions || []);
+      }
+    };
+    fetchTransactions();
+  }, []);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -77,12 +41,12 @@ const TransactionScreen: React.FC = () => {
   };
 
   const filteredTransactions = transactions.filter(transaction =>
-    transaction.title.toLowerCase().includes(searchQuery.toLowerCase())
+    transaction.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
     <div className="flex flex-col min-h-screen bg-[#FAFAFA]">
-      <div className="flex-1 pb-[74px]"> {/* Add padding bottom to account for navigation */}
+      <div className="flex-1 pb-[74px]">
         {/* Header */}
         <div className="flex items-center w-full relative py-5 px-4">
           <div className="flex-1 text-center">
@@ -129,10 +93,10 @@ const TransactionScreen: React.FC = () => {
           {filteredTransactions.map((transaction) => (
             <TransactionCard
               key={transaction.id}
-              title={transaction.title}
+              title={transaction.name}
               amount={formatCurrency(transaction.amount)}
-              type={transaction.type}
-              category={transaction.category}
+              type={transaction.type === 'INCOME' ? 'income' : 'expense'}
+              category={transaction.category?.name || ''}
             />
           ))}
         </div>
@@ -144,4 +108,4 @@ const TransactionScreen: React.FC = () => {
   );
 };
 
-export default TransactionScreen; 
+export default TransactionScreen;
