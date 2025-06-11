@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-
 import { Calendar, ChevronDown, ArrowLeft } from 'lucide-react';
 import DatePicker from 'react-datepicker';
+import { transactionService } from '@/lib/services/transaction';
+import { toast } from 'react-hot-toast';
 
 // @ts-ignore
 import 'react-datepicker/dist/react-datepicker.css';
@@ -51,13 +52,14 @@ interface TransactionFormProps {
   type: 'income' | 'expense';
   onClose: () => void;
   onSave: (data: TransactionFormData) => void;
+  isSubmitting?: boolean;
 }
 
 export interface TransactionFormData {
   type: "INCOME" | "EXPENSE";
   amount: number;
   date: string;
-  category: string;
+  categoryId: string;
   name: string;
   description?: string;
 }
@@ -66,16 +68,19 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   type,
   onClose,
   onSave,
+  isSubmitting = false,
 }) => {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [formData, setFormData] = useState<TransactionFormData>({
+  const [formData, setFormData] = useState<TransactionFormData & { categoryName?: string }>({
     type: type === 'income' ? 'INCOME' : 'EXPENSE',
     amount: 0,
-    date: '',
-    category: '',
+    date: new Date().toISOString(),
+    categoryId: '',
+    categoryName: '',
     name: '',
     description: '',
   });
+  const [isLoading, setIsLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
@@ -106,23 +111,55 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     };
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    
+    if (!formData.categoryId) {
+      toast.error('Pilih kategori terlebih dahulu');
+      return;
+    }
+
+    if (!formData.name) {
+      toast.error('Masukkan nama transaksi');
+      return;
+    }
+
+    if (!formData.amount || formData.amount <= 0) {
+      toast.error('Masukkan jumlah yang valid');
+      return;
+    }
+    
+    try {
+      // Convert amount to number and remove categoryName before sending to API
+      const { categoryName, ...dataToSubmit } = {
+        ...formData,
+        amount: Number(formData.amount)
+      };
+      await onSave(dataToSubmit);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Terjadi kesalahan');
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: name === 'amount' ? value.replace(/[^0-9]/g, '') : value 
+    }));
   };
 
-  const handleCategorySelect = (category: string) => {
-    setFormData(prev => ({ ...prev, category }));
+  const handleCategorySelect = (categoryId: string, categoryName: string) => {
+    setFormData(prev => ({ 
+      ...prev, 
+      categoryId,
+      categoryName,
+    }));
     setShowCategoryModal(false);
   };
 
   const handleDateChange = (date: Date | null) => {
-    setFormData(prev => ({ ...prev, date: date ? date.toISOString() : '' }));
+    setFormData(prev => ({ ...prev, date: date ? date.toISOString() : new Date().toISOString() }));
     setShowDatePicker(false);
   };
 
@@ -141,6 +178,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         {/* Header */}
         <div className="flex items-center w-full mb-8 relative py-5 px-4">
           <button 
+            type="button"
             onClick={onClose}
             className="absolute left-0 p-2"
           >
@@ -154,22 +192,22 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1">
-          {/* Type */}
+          {/* Name Field */}
           <div className="flex flex-col px-4 py-3">
             <label className="font-inter font-medium text-base text-[#0D141C] mb-2">
-              {type === 'income' ? 'Jenis Pemasukan' : 'Jenis Pengeluaran'}
+              Nama
             </label>
             <input
               type="text"
-              name="type"
-              placeholder={`e.g., ${type === 'income' ? 'Penjualan Produk' : 'Pembelian Bahan Baku'}`}
-              value={formData.type}
+              name="name"
+              value={formData.name}
               onChange={handleInputChange}
+              placeholder="Masukkan nama transaksi"
               className="w-full h-[56px] bg-[#EBF2E8] rounded-xl px-4 text-[#639154] placeholder-[#639154] font-inter"
             />
           </div>
 
-          {/* Amount */}
+          {/* Amount Field */}
           <div className="flex flex-col px-4 py-3">
             <label className="font-inter font-medium text-base text-[#0D141C] mb-2">
               Jumlah
@@ -179,7 +217,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 Rp
               </span>
               <input
-                type="number"
+                type="text"
                 name="amount"
                 value={formData.amount}
                 onChange={handleInputChange}
@@ -189,44 +227,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             </div>
           </div>
 
-          {/* Date */}
-          <div className="flex flex-col px-4 py-3">
-            <label className="font-inter font-medium text-base text-[#0D141C] mb-2">
-              Tanggal
-            </label>
-            <div className="relative">
-              <div 
-                className="flex w-full h-[56px] bg-[#EBF2E8] rounded-xl overflow-hidden cursor-pointer"
-                onClick={() => setShowDatePicker(true)}
-              >
-                <input
-                  type="text"
-                  readOnly
-                  value={formatDate(formData.date ? new Date(formData.date) : null)}
-                  placeholder="DD/MM/YYYY"
-                  className="flex-1 bg-transparent px-4 text-[#639154] placeholder-[#639154] font-inter cursor-pointer"
-                />
-                <div className="px-4 flex items-center justify-center">
-                  <Calendar className="w-6 h-6 text-[#639154]" />
-                </div>
-              </div>
-              {showDatePicker && (
-                <div className="absolute z-50 mt-2">
-                  <DatePicker
-                    selected={formData.date ? new Date(formData.date) : null}
-                    onChange={handleDateChange}
-                    inline
-                    dateFormat="dd/MM/yyyy"
-                    showPopperArrow={false}
-                    calendarClassName="bg-white shadow-lg rounded-lg border border-gray-200"
-                    onClickOutside={() => setShowDatePicker(false)}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Category */}
+          {/* Category Field */}
           <div className="flex flex-col px-4 py-3">
             <label className="font-inter font-medium text-base text-[#0D141C] mb-2">
               Kategori
@@ -236,46 +237,79 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               onClick={() => setShowCategoryModal(true)}
               className="relative w-full h-[56px] bg-[#EBF2E8] rounded-xl text-left"
             >
-              <span className={`px-4 font-inter ${formData.category ? 'text-[#639154]' : 'text-[#639154]'}`}>
-                {formData.category || 'Pilih Kategori'}
+              <span className={`px-4 font-inter ${formData.categoryName ? 'text-[#639154]' : 'text-[#639154]'}`}>
+                {formData.categoryName || 'Pilih Kategori'}
               </span>
               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 text-[#639154]" />
             </button>
           </div>
 
-          {/* Description */}
+          {/* Date Field */}
           <div className="flex flex-col px-4 py-3">
             <label className="font-inter font-medium text-base text-[#0D141C] mb-2">
-              Deskripsi
+              Tanggal
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowDatePicker(true)}
+              className="relative w-full h-[56px] bg-[#EBF2E8] rounded-xl text-left"
+            >
+              <span className="px-4 font-inter text-[#639154]">
+                {formatDate(formData.date ? new Date(formData.date) : null)}
+              </span>
+              <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 text-[#639154]" />
+            </button>
+          </div>
+
+          {/* Description Field */}
+          <div className="flex flex-col px-4 py-3">
+            <label className="font-inter font-medium text-base text-[#0D141C] mb-2">
+              Deskripsi (Opsional)
             </label>
             <textarea
               name="description"
-              placeholder="Tambahkan deskripsi singkat"
               value={formData.description}
               onChange={handleInputChange}
-              className="w-full min-h-[56px] bg-[#EBF2E8] rounded-xl px-4 py-4 text-[#639154] placeholder-[#639154] font-inter resize-none"
+              placeholder="Tambahkan deskripsi"
+              className="w-full h-[120px] bg-[#EBF2E8] rounded-xl p-4 text-[#639154] placeholder-[#639154] font-inter resize-none"
             />
           </div>
 
-          {/* Save Button */}
-          <div className="mt-auto px-4 py-3">
+          {/* Submit Button */}
+          <div className="mt-auto p-4">
             <button
               type="submit"
-              className="w-full h-12 bg-[#54D12B] rounded-[24px] font-inter font-bold text-base text-[#0D141C] shadow-md"
+              disabled={isSubmitting}
+              className={`w-full h-[56px] rounded-xl font-inter font-bold text-base ${
+                isSubmitting
+                  ? 'bg-[#EBF2E8] text-[#639154] cursor-not-allowed'
+                  : 'bg-[#54D12B] text-[#12190F]'
+              }`}
             >
-              Simpan
+              {isSubmitting ? 'Menyimpan...' : 'Simpan'}
             </button>
           </div>
         </form>
 
-        {/* Category Modal */}
         {showCategoryModal && (
           <CategoryModal
             type={type}
-            selectedCategory={formData.category}
+            selectedCategoryId={formData.categoryId}
             onSelect={handleCategorySelect}
             onClose={() => setShowCategoryModal(false)}
           />
+        )}
+
+        {showDatePicker && (
+          <div className="fixed inset-0 bg-black/30 z-[99999] flex items-center justify-center">
+            <div className="bg-white rounded-2xl p-4">
+              <DatePicker
+                selected={formData.date ? new Date(formData.date) : null}
+                onChange={handleDateChange}
+                inline
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>

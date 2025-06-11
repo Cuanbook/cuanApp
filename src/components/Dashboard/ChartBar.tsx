@@ -4,7 +4,8 @@ import {
   BarChart,
   XAxis,
   YAxis,
-  ResponsiveContainer
+  ResponsiveContainer,
+  Tooltip
 } from "recharts";
 
 interface ChartBarProps {
@@ -14,13 +15,24 @@ interface ChartBarProps {
   }>;
 }
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-2 rounded-lg shadow-md border border-gray-200">
+        <p className="text-sm font-semibold text-gray-700">{`${label}: Rp ${new Intl.NumberFormat('id-ID').format(payload[0].value)}`}</p>
+      </div>
+    );
+  }
+  return null;
+};
+
 export function ChartBar({ data }: ChartBarProps) {
   return (
     <div className="w-full h-[137px]">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}
-          margin={{ top: 0, right: 3, left: 3, bottom: 0 }}
+          margin={{ top: 10, right: 3, left: 3, bottom: 0 }}
           barGap={0}
         >
           <XAxis
@@ -33,16 +45,16 @@ export function ChartBar({ data }: ChartBarProps) {
               fontWeight: 700,
               fill: '#639154'
             }}
-            tickFormatter={(value) => value.slice(0, 3)}
           />
           <YAxis hide />
+          <Tooltip content={<CustomTooltip />} />
           <Bar
             dataKey="value"
             fill="#EBF2E8"
-            stroke="#757575"
+            stroke="#639154"
             strokeWidth={2}
             strokeOpacity={1}
-            radius={[0, 0, 0, 0]}
+            radius={[4, 4, 0, 0]}
             maxBarSize={45}
             isAnimationActive={true}
             animationBegin={0}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-
 import { Pencil } from 'lucide-react';
-import BaseModal from '@ui/BaseModal';
+import { toast } from 'react-hot-toast';
+import BaseModal from '../ui/BaseModal';
 
 interface EditOwnerNameModalProps {
   isOpen: boolean;
@@ -17,11 +17,19 @@ const EditOwnerNameModal: React.FC<EditOwnerNameModalProps> = ({
   currentName,
 }) => {
   const [ownerName, setOwnerName] = useState(currentName);
-  const [isEditing, setIsEditing] = useState(false);
 
   const handleSave = () => {
-    onSave(ownerName);
-    onClose();
+    try {
+      if (!ownerName.trim()) {
+        toast.error('Nama pemilik tidak boleh kosong');
+        return;
+      }
+      onSave(ownerName);
+      toast.success('Nama pemilik berhasil diubah');
+      onClose();
+    } catch (error) {
+      toast.error('Gagal mengubah nama pemilik');
+    }
   };
 
   return (
@@ -36,13 +44,11 @@ const EditOwnerNameModal: React.FC<EditOwnerNameModalProps> = ({
               onChange={(e) => setOwnerName(e.target.value)}
               className="w-full bg-transparent outline-none font-inter text-[#0F1417]"
               placeholder="Nama Pemilik"
-              disabled={!isEditing}
             />
           </div>
           <div className="bg-[#EBF2E8] px-4 flex items-center rounded-r-xl">
             <Pencil 
-              className={`w-6 h-6 cursor-pointer ${isEditing ? 'text-[#639154]' : 'text-[#54D12B]'}`}
-              onClick={() => setIsEditing(!isEditing)}
+              className="w-6 h-6 cursor-pointer text-[#54D12B]"
             />
           </div>
         </div>
@@ -50,10 +56,7 @@ const EditOwnerNameModal: React.FC<EditOwnerNameModalProps> = ({
         {/* Save Button */}
         <button
           onClick={handleSave}
-          disabled={!isEditing}
-          className={`w-full font-inter font-bold py-4 rounded-[32px] text-base ${
-            isEditing ? 'bg-[#54D12B] text-white' : 'bg-[#E5E5E5] text-[#9E9E9E] cursor-not-allowed'
-          }`}
+          className="w-full font-inter font-bold py-4 rounded-[32px] text-base bg-[#54D12B] text-white"
         >
           Simpan
         </button>

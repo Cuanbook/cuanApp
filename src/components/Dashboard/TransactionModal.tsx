@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
-
 import { ArrowLeft } from 'lucide-react';
-
 import TransactionForm, { TransactionFormData } from './TransactionForm';
+import { toast } from 'react-hot-toast';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -17,6 +16,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 }) => {
   const [selectedType, setSelectedType] = React.useState<'income' | 'expense' | null>(null);
   const [activeButton, setActiveButton] = React.useState<'income' | 'expense' | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -42,6 +42,19 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     };
   }, [isOpen]);
 
+  const handleSave = async (data: TransactionFormData) => {
+    try {
+      setIsSubmitting(true);
+      await onSave(data);
+      setSelectedType(null);
+      setActiveButton(null);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Terjadi kesalahan');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   if (selectedType) {
@@ -53,7 +66,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
           setActiveButton(null);
           onClose();
         }}
-        onSave={onSave}
+        onSave={handleSave}
+        isSubmitting={isSubmitting}
       />
     );
   }

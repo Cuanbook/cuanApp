@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-
 import { Pencil } from 'lucide-react';
-
+import { toast } from 'react-hot-toast';
 import BaseModal from '../ui/BaseModal';
 
 interface EditContactModalProps {
@@ -18,11 +17,25 @@ const EditContactModal: React.FC<EditContactModalProps> = ({
   currentContact,
 }) => {
   const [contact, setContact] = useState(currentContact);
-  const [isEditing, setIsEditing] = useState(false);
 
   const handleSave = () => {
-    onSave(contact);
-    onClose();
+    try {
+      if (!contact.trim()) {
+        toast.error('Nomor kontak tidak boleh kosong');
+        return;
+      }
+      // Basic phone number validation
+      const phoneRegex = /^(\+62|62|0)[0-9]{9,12}$/;
+      if (!phoneRegex.test(contact.replace(/\s+/g, ''))) {
+        toast.error('Format nomor kontak tidak valid');
+        return;
+      }
+      onSave(contact);
+      toast.success('Nomor kontak berhasil diubah');
+      onClose();
+    } catch (error) {
+      toast.error('Gagal mengubah nomor kontak');
+    }
   };
 
   return (
@@ -37,13 +50,11 @@ const EditContactModal: React.FC<EditContactModalProps> = ({
               onChange={(e) => setContact(e.target.value)}
               className="w-full bg-transparent outline-none font-inter text-[#0F1417]"
               placeholder="Nomor Kontak"
-              disabled={!isEditing}
             />
           </div>
           <div className="bg-[#EBF2E8] px-4 flex items-center rounded-r-xl">
             <Pencil 
-              className={`w-6 h-6 cursor-pointer ${isEditing ? 'text-[#639154]' : 'text-[#54D12B]'}`}
-              onClick={() => setIsEditing(!isEditing)}
+              className="w-6 h-6 cursor-pointer text-[#54D12B]"
             />
           </div>
         </div>
@@ -51,10 +62,7 @@ const EditContactModal: React.FC<EditContactModalProps> = ({
         {/* Save Button */}
         <button
           onClick={handleSave}
-          disabled={!isEditing}
-          className={`w-full font-inter font-bold py-4 rounded-[32px] text-base ${
-            isEditing ? 'bg-[#54D12B] text-white' : 'bg-[#E5E5E5] text-[#9E9E9E] cursor-not-allowed'
-          }`}
+          className="w-full font-inter font-bold py-4 rounded-[32px] text-base bg-[#54D12B] text-white"
         >
           Simpan
         </button>

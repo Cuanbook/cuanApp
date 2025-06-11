@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-
 import { User, Building2, Mail, Phone, Lock, LogOut, Trash2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
+import { getApiUrl } from '@/config/api';
 
 import ChangePasswordModal from '@components/Account/ChangePasswordModal';
 import EditBusinessNameModal from '@components/Account/EditBusinessNameModal';
@@ -10,6 +12,7 @@ import EditOwnerNameModal from '@components/Account/EditOwnerNameModal';
 import BottomNavigation from '@ui/BottomNavigation';
 
 const Account: React.FC = () => {
+  const navigate = useNavigate();
   // Modal visibility states
   const [isEditBusinessNameOpen, setIsEditBusinessNameOpen] = useState(false);
   const [isEditOwnerNameOpen, setIsEditOwnerNameOpen] = useState(false);
@@ -28,7 +31,7 @@ const Account: React.FC = () => {
     const fetchProfile = async () => {
       const token = localStorage.getItem('token');
       if (!token) return;
-      const res = await fetch('http://localhost:3000/api/auth/me', {
+      const res = await fetch(getApiUrl('auth/me'), {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -44,7 +47,7 @@ const Account: React.FC = () => {
 
   const updateProfile = async (fields: any) => {
     const token = localStorage.getItem('token');
-    const res = await fetch('http://localhost:3000/api/account', {
+    const res = await fetch(getApiUrl('account'), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -54,7 +57,6 @@ const Account: React.FC = () => {
     });
     if (res.ok) {
       const data = await res.json();
-      // Update state sesuai response
       setBusinessName(data.businessName || '');
       setOwnerName(data.businessOwner || '');
       setContact(data.phoneNumber || '');
@@ -81,11 +83,11 @@ const Account: React.FC = () => {
 
   const handleSavePassword = async (passwords: { current: string; new: string; confirm: string }) => {
     if (passwords.new !== passwords.confirm) {
-      alert('Konfirmasi password tidak cocok');
+      toast.error('Konfirmasi password tidak cocok');
       return;
     }
     const token = localStorage.getItem('token');
-    const res = await fetch('http://localhost:3000/api/account/password', {
+    const res = await fetch(getApiUrl('account/password'), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -95,33 +97,36 @@ const Account: React.FC = () => {
     });
     const data = await res.json();
     if (res.ok) {
-      alert('Password berhasil diubah');
+      toast.success('Password berhasil diubah');
     } else {
-      alert(data.message || 'Gagal mengubah password');
+      toast.error(data.message || 'Gagal mengubah password');
     }
   };
 
   const handleDeleteAccount = async () => {
-    if (!window.confirm('Yakin ingin menghapus akun?')) return;
-    const token = localStorage.getItem('token');
-    const res = await fetch('http://localhost:3000/api/account', {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const data = await res.json();
-    if (res.ok) {
-      alert('Akun berhasil dihapus');
-      // Logout dan redirect ke halaman login
-      localStorage.removeItem('token');
-      window.location.href = '/login';
-    } else {
-      alert(data.message || 'Gagal menghapus akun');
+    if (window.confirm('Apakah Anda yakin ingin menghapus akun? Tindakan ini tidak dapat dibatalkan.')) {
+      const token = localStorage.getItem('token');
+      const res = await fetch(getApiUrl('account'), {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Akun berhasil dihapus');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(data.message || 'Gagal menghapus akun');
+      }
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    window.location.href = '/login';
+    if (window.confirm('Apakah Anda yakin ingin keluar?')) {
+      localStorage.removeItem('token');
+      toast.success('Berhasil keluar');
+      navigate('/login');
+    }
   };
 
   return (
