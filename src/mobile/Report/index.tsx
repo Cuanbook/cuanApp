@@ -1,39 +1,54 @@
-import React, { useState } from 'react';
-
+import React, { useState, useEffect } from 'react';
 import { ArrowUpRight, ArrowDownLeft, FileText } from 'lucide-react';
-
 import BottomNavigation from '@ui/BottomNavigation';
 import { ChartLineSimple } from '@components/Report/ChartLineSimple';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
+import { toast } from 'react-hot-toast';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { UserOptions } from 'jspdf-autotable';
+import { getApiUrl } from '@/config/api';
+
+// Add type augmentation for jsPDF
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: UserOptions) => jsPDF;
+  }
+}
 
 type TabType = 'ringkasan' | 'pemasukan' | 'pengeluaran';
 
-// Chart data for each tab
-const chartData = {
-  ringkasan: [
-    { month: "2024-01", value: 2100000 },
-    { month: "2024-02", value: 1890000 },
-    { month: "2024-03", value: 2250000 },
-    { month: "2024-04", value: 1950000 },
-    { month: "2024-05", value: 2450000 },
-    { month: "2024-06", value: 2680000 }
-  ],
-  pemasukan: [
-    { month: "2024-01", value: 1200000 },
-    { month: "2024-02", value: 1500000 },
-    { month: "2024-03", value: 1800000 },
-    { month: "2024-04", value: 1600000 },
-    { month: "2024-05", value: 2100000 },
-    { month: "2024-06", value: 2300000 }
-  ],
-  pengeluaran: [
-    { month: "2024-01", value: 900000 },
-    { month: "2024-02", value: 750000 },
-    { month: "2024-03", value: 1100000 },
-    { month: "2024-04", value: 850000 },
-    { month: "2024-05", value: 950000 },
-    { month: "2024-06", value: 1200000 }
-  ]
-};
+interface Transaction {
+  id: string;
+  amount: number;
+  type: "INCOME" | "EXPENSE";
+  category: {
+    name: string;
+    type: "INCOME" | "EXPENSE";
+  };
+  description: string;
+  date: string;
+  name?: string;
+}
+
+interface ChartData {
+  month: string;
+  value: number;
+}
+
+interface ReportData {
+  transactions: Transaction[];
+  summary: {
+    INCOME: number;
+    EXPENSE: number;
+  };
+  chartData: ChartData[];
+  trend: {
+    percentage: number;
+    isUp: boolean;
+  };
+}
 
 interface TransactionItemProps {
   title: string;
@@ -70,189 +85,302 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ title, type, amount, 
 const Report: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('ringkasan');
   const [prevTab, setPrevTab] = useState<TabType>('ringkasan');
+  const [reportData, setReportData] = useState<ReportData>({
+    transactions: [],
+    summary: { INCOME: 0, EXPENSE: 0 },
+    chartData: [],
+    trend: { percentage: 0, isUp: true }
+  });
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatTransactionAmount = (amount: number, type: 'INCOME' | 'EXPENSE') => {
+    const formatted = new Intl.NumberFormat('id-ID', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+    return `${type === 'INCOME' ? '+' : '-'} Rp ${formatted}`;
+  };
+
+  const fetchTransactions = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const response = await fetch(
+        getApiUrl(`transactions?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setTransactions(data.transactions || []);
+      }
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+    }
+  };
+
+  useEffect(() => {
+    const fetchReportData = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+
+      // Get the first day of current month
+      const startDate = new Date(currentYear, currentMonth - 1, 1);
+      // Get the last day of current month
+      const endDate = new Date(currentYear, currentMonth, 0);
+
+      let endpoint = '';
+      switch (activeTab) {
+        case 'pemasukan':
+          endpoint = `/reports/monthly?year=${currentYear}&month=${currentMonth}&type=INCOME`;
+          break;
+        case 'pengeluaran':
+          endpoint = `/reports/monthly?year=${currentYear}&month=${currentMonth}&type=EXPENSE`;
+          break;
+        default:
+          endpoint = `/reports/monthly?year=${currentYear}&month=${currentMonth}`;
+      }
+
+      try {
+        const res = await fetch(`${getApiUrl(endpoint)}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          
+          // Get transactions for the current month
+          const txRes = await fetch(
+            `${getApiUrl("transactions")}?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`, 
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          if (txRes.ok) {
+            const txData = await txRes.json();
+            
+            // Format chart data to include proper dates
+            const chartData = data.chartData?.map((item: any) => ({
+              ...item,
+              month: new Date(currentYear, parseInt(item.month) - 1, 1).toISOString()
+            })) || [];
+
+            setReportData({
+              transactions: txData.transactions,
+              summary: txData.summary,
+              chartData,
+              trend: {
+                percentage: data.percentageChange || 0,
+                isUp: (data.percentageChange || 0) >= 0
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching report data:', error);
+      }
+    };
+
+    fetchReportData();
+  }, [activeTab]);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [startDate, endDate]);
 
   const handleTabChange = (tab: TabType) => {
     if (tab !== activeTab) {
       setPrevTab(activeTab);
       setActiveTab(tab);
+      setSelectedCategory('all');
     }
   };
 
+  const filteredTransactions = reportData.transactions.filter(tx => {
+    if (selectedCategory === 'all') return true;
+    return tx.category.name.toLowerCase() === selectedCategory.toLowerCase();
+  });
+
+  const getCategories = () => {
+    const categories = new Set(reportData.transactions.map(tx => tx.category.name));
+    return Array.from(categories);
+  };
+
+  const generatePDF = async () => {
+    const doc = new jsPDF();
+
+    // Add title
+    doc.setFontSize(20);
+    doc.text("Laporan Transaksi", 105, 15, { align: "center" });
+
+    // Add date range
+    doc.setFontSize(12);
+    doc.text(
+      `Periode: ${format(startDate, "dd MMMM yyyy", { locale: id })} - ${format(
+        endDate,
+        "dd MMMM yyyy",
+        { locale: id }
+      )}`,
+      105,
+      25,
+      { align: "center" }
+    );
+
+    // Calculate summary
+    const summary = transactions.reduce(
+      (acc, curr) => {
+        if (curr.type === "INCOME") {
+          acc.totalIncome += curr.amount;
+        } else {
+          acc.totalExpense += curr.amount;
+        }
+        return acc;
+      },
+      { totalIncome: 0, totalExpense: 0 }
+    );
+
+    // Add summary section
+    doc.text("Ringkasan:", 14, 35);
+    doc.text(`Total Pemasukan: ${formatCurrency(summary.totalIncome)}`, 14, 45);
+    doc.text(`Total Pengeluaran: ${formatCurrency(summary.totalExpense)}`, 14, 55);
+    doc.text(
+      `Saldo: ${formatCurrency(summary.totalIncome - summary.totalExpense)}`,
+      14,
+      65
+    );
+
+    // Add transactions table
+    const tableData = transactions.map((t) => [
+      format(new Date(t.date), "dd/MM/yyyy"),
+      t.category.name,
+      t.description || "-",
+      t.type === "INCOME" ? "Pemasukan" : "Pengeluaran",
+      formatCurrency(t.amount),
+    ]);
+
+    (doc as any).autoTable({
+      startY: 75,
+      head: [["Tanggal", "Kategori", "Deskripsi", "Tipe", "Jumlah"]],
+      body: tableData,
+      theme: "grid",
+      styles: {
+        fontSize: 8,
+        cellPadding: 2,
+      },
+      headStyles: {
+        fillColor: [84, 209, 43],
+      },
+      alternateRowStyles: {
+        fillColor: [235, 242, 232],
+      },
+    });
+
+    doc.save("laporan-transaksi.pdf");
+  };
+
   const renderContent = () => {
-    switch (activeTab) {
-      case 'pemasukan':
-        return (
-          <>
-            <div className="px-4 pt-5 pb-3">
-              <h2 className="font-inter font-bold text-[22px] text-[#111611]">Pemasukan</h2>
-            </div>
+    const categories = getCategories();
+    const totalAmount = activeTab === 'pemasukan' 
+      ? reportData.summary.INCOME 
+      : activeTab === 'pengeluaran' 
+        ? reportData.summary.EXPENSE 
+        : reportData.summary.INCOME - reportData.summary.EXPENSE;
 
-            <div className="px-4 py-6">
-              <ChartLineSimple 
-                title="Tren Pemasukan"
-                amount="12.345.000"
-                trend={{ percentage: 12, isUp: true }}
-                data={chartData.pemasukan}
-                shouldAnimate={activeTab !== prevTab}
-              />
-            </div>
+    return (
+      <>
+        <div className="px-4 pt-5 pb-3">
+          <h2 className="font-inter font-bold text-[22px] text-[#111611]">
+            {activeTab === 'ringkasan' ? 'Pemasukan vs. Pengeluaran' :
+             activeTab === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}
+          </h2>
+        </div>
 
-            <div className="px-4 pt-5 pb-3">
-              <h2 className="font-inter font-bold text-[22px] text-[#111611]">Transaksi</h2>
-            </div>
+        <div className="px-4 py-6">
+          <ChartLineSimple 
+            title={activeTab === 'ringkasan' ? 'Pemasukan vs. Pengeluaran' :
+                  activeTab === 'pemasukan' ? 'Tren Pemasukan' : 'Tren Pengeluaran'}
+            amount={formatCurrency(totalAmount)}
+            trend={reportData.trend}
+            data={reportData.chartData}
+            shouldAnimate={activeTab !== prevTab}
+          />
+        </div>
 
-            <div className="flex gap-3 px-3">
-              <button className="h-8 bg-[#EBF2E8] rounded-2xl px-4 flex items-center">
-                <span className="font-inter text-sm font-medium text-[#111611]">Semua</span>
-              </button>
-              <button className="h-8 bg-[#EBF2E8] rounded-2xl px-4 flex items-center">
-                <span className="font-inter text-sm font-medium text-[#111611]">Penjualan</span>
-              </button>
-              <button className="h-8 bg-[#EBF2E8] rounded-2xl px-4 flex items-center">
-                <span className="font-inter text-sm font-medium text-[#111611]">Jasa</span>
-              </button>
-            </div>
+        <div className="px-4 pt-5 pb-3">
+          <h2 className="font-inter font-bold text-[22px] text-[#111611]">Transaksi</h2>
+        </div>
 
-            <div className="flex flex-col mt-2">
+        <div className="flex gap-3 px-3 overflow-x-auto">
+          <button 
+            className={`h-8 bg-[#EBF2E8] rounded-2xl px-4 flex items-center ${
+              selectedCategory === 'all' ? 'bg-white shadow-[0px_0px_4px_0px_rgba(0,0,0,0.1)]' : ''
+            }`}
+            onClick={() => setSelectedCategory('all')}
+          >
+            <span className={`font-inter text-sm font-medium whitespace-nowrap ${
+              selectedCategory === 'all' ? 'text-[#111611]' : 'text-[#639154]'
+            }`}>
+              Semua
+            </span>
+          </button>
+          {categories.map(category => (
+            <button 
+              key={category}
+              className={`h-8 bg-[#EBF2E8] rounded-2xl px-4 flex items-center ${
+                selectedCategory === category.toLowerCase() ? 'bg-white shadow-[0px_0px_4px_0px_rgba(0,0,0,0.1)]' : ''
+              }`}
+              onClick={() => setSelectedCategory(category.toLowerCase())}
+            >
+              <span className={`font-inter text-sm font-medium whitespace-nowrap ${
+                selectedCategory === category.toLowerCase() ? 'text-[#111611]' : 'text-[#639154]'
+              }`}>
+                {category}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-col mt-2">
+          {filteredTransactions.length > 0 ? (
+            filteredTransactions.map((tx) => (
               <TransactionItem
-                title="Penjualan Produk"
-                type="Penjualan"
-                amount="+ Rp 1.200.000"
-                icon={<ArrowUpRight className="stroke-[2]" />}
+                key={tx.id}
+                title={tx.name}
+                type={tx.category.name}
+                description={tx.description}
+                amount={formatTransactionAmount(tx.amount, tx.type)}
+                icon={tx.type === 'INCOME' ? <ArrowUpRight className="stroke-[2]" /> : <ArrowDownLeft className="stroke-[2]" />}
+                isExpense={tx.type === 'EXPENSE'}
               />
-              <TransactionItem
-                title="Biaya Konsultasi"
-                type="Jasa"
-                amount="+ Rp 800.000"
-                icon={<ArrowUpRight className="stroke-[2]" />}
-              />
-              <TransactionItem
-                title="Penjualan Produk"
-                type="Penjualan"
-                amount="+ Rp 1.500.000"
-                icon={<ArrowUpRight className="stroke-[2]" />}
-              />
+            ))
+          ) : (
+            <div className="flex justify-center items-center py-8 text-gray-500">
+              Tidak ada transaksi
             </div>
-          </>
-        );
-      case 'pengeluaran':
-        return (
-          <>
-            <div className="px-4 pt-5 pb-3">
-              <h2 className="font-inter font-bold text-[22px] text-[#111611]">Pengeluaran</h2>
-            </div>
-
-            <div className="px-4 py-6">
-              <ChartLineSimple 
-                title="Tren Pengeluaran"
-                amount="12.345.000"
-                trend={{ percentage: 8, isUp: false }}
-                data={chartData.pengeluaran}
-                shouldAnimate={activeTab !== prevTab}
-              />
-            </div>
-
-            <div className="px-4 pt-5 pb-3">
-              <h2 className="font-inter font-bold text-[22px] text-[#111611]">Transaksi</h2>
-            </div>
-
-            <div className="flex gap-3 px-3">
-              <button className="h-8 bg-[#EBF2E8] rounded-2xl px-4 flex items-center">
-                <span className="font-inter text-sm font-medium text-[#111611]">Semua</span>
-              </button>
-              <button className="h-8 bg-[#EBF2E8] rounded-2xl px-4 flex items-center">
-                <span className="font-inter text-sm font-medium text-[#111611]">Perlengkapan</span>
-              </button>
-              <button className="h-8 bg-[#EBF2E8] rounded-2xl px-4 flex items-center">
-                <span className="font-inter text-sm font-medium text-[#111611]">Sewa</span>
-              </button>
-            </div>
-
-            <div className="flex flex-col mt-2">
-              <TransactionItem
-                title="Beli Perlengkapan"
-                type="Perlengkapan"
-                description="Perlengkapan Kantor"
-                amount="- Rp 150.000"
-                icon={<ArrowDownLeft className="stroke-[2]" />}
-                isExpense
-              />
-              <TransactionItem
-                title="Transportasi"
-                type="Transportasi"
-                description="Pembelian Bahan Bakar"
-                amount="- Rp 300.000"
-                icon={<ArrowDownLeft className="stroke-[2]" />}
-                isExpense
-              />
-              <TransactionItem
-                title="Gaji Karyawan"
-                type="Gaji"
-                description="Pembayaran Gaji Bulanan"
-                amount="- Rp 1.300.000"
-                icon={<ArrowDownLeft className="stroke-[2]" />}
-                isExpense
-              />
-            </div>
-          </>
-        );
-      default:
-        return (
-          <>
-            <div className="px-4 pt-5 pb-3">
-              <h2 className="font-inter font-bold text-[22px] text-[#111611]">Pemasukan vs. Pengeluaran</h2>
-            </div>
-
-            <div className="px-4 py-6">
-              <ChartLineSimple 
-                title="Pemasukan vs. Pengeluaran"
-                amount="12.345.000"
-                trend={{ percentage: 12, isUp: true }}
-                data={chartData.ringkasan}
-                shouldAnimate={activeTab !== prevTab}
-              />
-            </div>
-
-            <div className="px-4 pt-5 pb-3">
-              <h2 className="font-inter font-bold text-[22px] text-[#111611]">Transaksi</h2>
-            </div>
-
-            <div className="flex gap-3 px-3">
-              <button className="h-8 bg-[#EBF2E8] rounded-2xl px-4 flex items-center">
-                <span className="font-inter text-sm font-medium text-[#111611]">Semua</span>
-              </button>
-              <button className="h-8 bg-[#EBF2E8] rounded-2xl px-4 flex items-center">
-                <span className="font-inter text-sm font-medium text-[#111611]">Pemasukan</span>
-              </button>
-              <button className="h-8 bg-[#EBF2E8] rounded-2xl px-4 flex items-center">
-                <span className="font-inter text-sm font-medium text-[#111611]">Pengeluaran</span>
-              </button>
-            </div>
-
-            <div className="flex flex-col mt-2">
-              <TransactionItem
-                title="Transaksi 1"
-                type="Penjualan"
-                amount="+ Rp 1.000.000"
-                icon={<ArrowUpRight className="stroke-[2]" />}
-              />
-              <TransactionItem
-                title="Transaksi 2"
-                type="Pembelian"
-                amount="- Rp 500.000"
-                icon={<ArrowDownLeft className="stroke-[2]" />}
-                isExpense
-              />
-              <TransactionItem
-                title="Transaksi 3"
-                type="Penjualan"
-                amount="+ Rp 2.000.000"
-                icon={<ArrowUpRight className="stroke-[2]" />}
-              />
-            </div>
-          </>
-        );
-    }
+          )}
+        </div>
+      </>
+    );
   };
 
   return (
@@ -291,7 +419,10 @@ const Report: React.FC = () => {
 
       {/* Export Button */}
       <div className="flex justify-end px-5 py-5">
-        <button className="flex items-center gap-4 bg-[#54D12B] rounded-[28px] py-4 px-6 shadow-[0px_4px_4px_0px_rgba(0,0,0,0.25)]">
+        <button 
+          onClick={generatePDF}
+          className="flex items-center gap-4 bg-[#54D12B] rounded-[28px] py-4 px-6 shadow-[0px_4px_4px_0px_rgba(0,0,0,0.25)]"
+        >
           <FileText className="w-6 h-6 text-[#0F1417]" />
           <span className="font-inter text-base font-bold text-[#0F1417]">Ekspor PDF</span>
         </button>

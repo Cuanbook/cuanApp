@@ -7,6 +7,7 @@ interface TransactionCardProps {
   amount: string;
   type: 'income' | 'expense';
   category: string;
+  date: string;
 }
 
 const TransactionCard: React.FC<TransactionCardProps> = ({
@@ -14,6 +15,7 @@ const TransactionCard: React.FC<TransactionCardProps> = ({
   amount,
   type,
   category,
+  date,
 }) => {
   const isIncome = type === 'income';
   const Icon = isIncome ? ArrowUpRight : ArrowDownLeft;

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-
 import { Pencil } from 'lucide-react';
-
+import { toast } from 'react-hot-toast';
 import BaseModal from '../ui/BaseModal';
 
 interface EditEmailModalProps {
@@ -18,11 +17,25 @@ const EditEmailModal: React.FC<EditEmailModalProps> = ({
   currentEmail,
 }) => {
   const [email, setEmail] = useState(currentEmail);
-  const [isEditing, setIsEditing] = useState(false);
 
   const handleSave = () => {
-    onSave(email);
-    onClose();
+    try {
+      if (!email.trim()) {
+        toast.error('Email tidak boleh kosong');
+        return;
+      }
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        toast.error('Format email tidak valid');
+        return;
+      }
+      onSave(email);
+      toast.success('Email berhasil diubah');
+      onClose();
+    } catch (error) {
+      toast.error('Gagal mengubah email');
+    }
   };
 
   return (
@@ -37,13 +50,11 @@ const EditEmailModal: React.FC<EditEmailModalProps> = ({
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-transparent outline-none font-inter text-[#0F1417]"
               placeholder="Email"
-              disabled={!isEditing}
             />
           </div>
           <div className="bg-[#EBF2E8] px-4 flex items-center rounded-r-xl">
             <Pencil 
-              className={`w-6 h-6 cursor-pointer ${isEditing ? 'text-[#639154]' : 'text-[#54D12B]'}`}
-              onClick={() => setIsEditing(!isEditing)}
+              className="w-6 h-6 cursor-pointer text-[#54D12B]"
             />
           </div>
         </div>
@@ -51,10 +62,7 @@ const EditEmailModal: React.FC<EditEmailModalProps> = ({
         {/* Save Button */}
         <button
           onClick={handleSave}
-          disabled={!isEditing}
-          className={`w-full font-inter font-bold py-4 rounded-[32px] text-base ${
-            isEditing ? 'bg-[#54D12B] text-white' : 'bg-[#E5E5E5] text-[#9E9E9E] cursor-not-allowed'
-          }`}
+          className="w-full font-inter font-bold py-4 rounded-[32px] text-base bg-[#54D12B] text-white"
         >
           Simpan
         </button>

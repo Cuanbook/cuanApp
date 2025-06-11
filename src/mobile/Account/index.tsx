@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-
+import React, { useState, useEffect } from 'react';
 import { User, Building2, Mail, Phone, Lock, LogOut, Trash2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
+import { getApiUrl } from '@/config/api';
 
 import ChangePasswordModal from '@components/Account/ChangePasswordModal';
 import EditBusinessNameModal from '@components/Account/EditBusinessNameModal';
@@ -10,6 +12,7 @@ import EditOwnerNameModal from '@components/Account/EditOwnerNameModal';
 import BottomNavigation from '@ui/BottomNavigation';
 
 const Account: React.FC = () => {
+  const navigate = useNavigate();
   // Modal visibility states
   const [isEditBusinessNameOpen, setIsEditBusinessNameOpen] = useState(false);
   const [isEditOwnerNameOpen, setIsEditOwnerNameOpen] = useState(false);
@@ -23,26 +26,107 @@ const Account: React.FC = () => {
   const [contact, setContact] = useState('+6281234567890');
   const [email, setEmail] = useState('Budi.santoso@email.com');
 
+  // Fetch profile data
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const res = await fetch(getApiUrl('auth/me'), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBusinessName(data.businessName || '');
+        setOwnerName(data.businessOwner || '');
+        setContact(data.phoneNumber || '');
+        setEmail(data.email || '');
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const updateProfile = async (fields: any) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(getApiUrl('account'), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(fields)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setBusinessName(data.businessName || '');
+      setOwnerName(data.businessOwner || '');
+      setContact(data.phoneNumber || '');
+      setEmail(data.email || '');
+    }
+  };
+
   // Handle save functions
   const handleSaveBusinessName = (newName: string) => {
-    setBusinessName(newName);
+    updateProfile({ businessName: newName });
   };
 
   const handleSaveOwnerName = (newName: string) => {
-    setOwnerName(newName);
+    updateProfile({ businessOwner: newName });
   };
 
   const handleSaveContact = (newContact: string) => {
-    setContact(newContact);
+    updateProfile({ phoneNumber: newContact });
   };
 
   const handleSaveEmail = (newEmail: string) => {
-    setEmail(newEmail);
+    updateProfile({ email: newEmail });
   };
 
-  const handleSavePassword = (passwords: { current: string; new: string; confirm: string }) => {
-    // Handle password change logic here
-    console.log('Password changed:', passwords);
+  const handleSavePassword = async (passwords: { current: string; new: string; confirm: string }) => {
+    if (passwords.new !== passwords.confirm) {
+      toast.error('Konfirmasi password tidak cocok');
+      return;
+    }
+    const token = localStorage.getItem('token');
+    const res = await fetch(getApiUrl('account/password'), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ oldPassword: passwords.current, newPassword: passwords.new })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      toast.success('Password berhasil diubah');
+    } else {
+      toast.error(data.message || 'Gagal mengubah password');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (window.confirm('Apakah Anda yakin ingin menghapus akun? Tindakan ini tidak dapat dibatalkan.')) {
+      const token = localStorage.getItem('token');
+      const res = await fetch(getApiUrl('account'), {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Akun berhasil dihapus');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(data.message || 'Gagal menghapus akun');
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    if (window.confirm('Apakah Anda yakin ingin keluar?')) {
+      localStorage.removeItem('token');
+      toast.success('Berhasil keluar');
+      navigate('/login');
+    }
   };
 
   return (
@@ -153,14 +237,20 @@ const Account: React.FC = () => {
         </div>
 
         <div className="flex flex-col gap-4 px-4">
-          <div className="flex items-center gap-4 cursor-pointer active:bg-[#EBF2E8] transition-colors">
+          <div
+            className="flex items-center gap-4 cursor-pointer active:bg-[#EBF2E8] transition-colors"
+            onClick={handleLogout}
+          >
             <div className="w-10 h-10 bg-[#EBF2E8] rounded-lg flex items-center justify-center">
               <LogOut className="w-6 h-6 text-[#111611]" />
             </div>
             <span className="font-inter text-base text-[#111611]">Keluar</span>
           </div>
 
-          <div className="flex items-center gap-4 cursor-pointer active:bg-[#EBF2E8] transition-colors">
+          <div 
+            className="flex items-center gap-4 cursor-pointer active:bg-[#EBF2E8] transition-colors"
+            onClick={handleDeleteAccount}
+          >
             <div className="w-10 h-10 bg-[#EBF2E8] rounded-lg flex items-center justify-center">
               <Trash2 className="w-6 h-6 text-[#111611]" />
             </div>
@@ -209,4 +299,4 @@ const Account: React.FC = () => {
   );
 };
 
-export default Account; 
+export default Account;
