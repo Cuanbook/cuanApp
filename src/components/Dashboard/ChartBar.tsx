@@ -28,7 +28,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export function ChartBar({ data }: ChartBarProps) {
   return (
-    <div className="w-full h-[137px]">
+    <div className="w-full h-[137px]" data-testid="chart-bar">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}
@@ -65,4 +65,4 @@ export function ChartBar({ data }: ChartBarProps) {
       </ResponsiveContainer>
     </div>
   );
-} 
+}

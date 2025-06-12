@@ -8,6 +8,7 @@ describe('ChangePasswordModal', () => {
     render(
       <ChangePasswordModal isOpen={true} onClose={() => {}} onSave={() => {}} />
     );
-    expect(screen.getByText(/Password/i)).toBeInTheDocument();
+    // Cek judul modal atau placeholder input
+    expect(screen.getByText(/Kata Sandi/i)).toBeInTheDocument();
   });
-}); 
+});
